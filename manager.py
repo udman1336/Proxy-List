@@ -27,6 +27,12 @@ def copy_json_files(src_dir, dest_dir):
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)  # Create directories if they don't exist
                 shutil.copy(file_path, dest_path)  # Copy the file
 
+        # Add directories if they are empty, GitHub will not track empty directories
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            dest_dir_path = os.path.join(dest_dir, os.path.relpath(dir_path, src_dir))
+            os.makedirs(dest_dir_path, exist_ok=True)
+
 def upload_to_github():
     """Uploads all .json files and directories containing them from OUTPUT_DIR to GitHub"""
     try:
@@ -37,7 +43,7 @@ def upload_to_github():
         copy_json_files(OUTPUT_DIR, REPO_PATH)
 
         repo.git.add(A=True)  # Adds all new or modified files
-        repo.index.commit("Updated proxy list with latest .json files")
+        repo.index.commit("Updated proxy list with latest .json files and folders")
         origin = repo.remote(name="origin")
         origin.push()
 
