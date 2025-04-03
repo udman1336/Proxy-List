@@ -4,6 +4,7 @@ import threading
 import time
 import git
 import schedule
+import shutil
 
 REPO_PATH = "/root/Proxy-List"
 OUTPUT_DIR = "/root/ProxyCheck/out/"
@@ -15,31 +16,43 @@ def run_scraper():
         subprocess.run(["sh", "start.sh"], cwd="/root/ProxyCheck")
         print("[*] Scraper finished. Waiting 30 minutes before next run...")
 
+def copy_json_files(src_dir, dest_dir):
+    """Copies all .json files from src_dir to dest_dir, including subdirectories"""
+    for root, dirs, files in os.walk(src_dir):
+        for file in files:
+            if file.endswith(".json"):
+                file_path = os.path.join(root, file)
+                # Create the corresponding path in the destination directory
+                dest_path = os.path.join(dest_dir, os.path.relpath(root, src_dir), file)
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)  # Create directories if they don't exist
+                shutil.copy(file_path, dest_path)  # Copy the file
+
 def upload_to_github():
-    """Uploads all files from OUTPUT_DIR to GitHub"""
+    """Uploads all .json files and directories containing them from OUTPUT_DIR to GitHub"""
     try:
         repo = git.Repo(REPO_PATH)
         repo.git.pull()
-        
-        for file in os.listdir(OUTPUT_DIR):
-            file_path = os.path.join(OUTPUT_DIR, file)
-            if os.path.isfile(file_path):
-                os.system(f"cp {file_path} {REPO_PATH}/")
 
-        repo.git.add(A=True)
-        repo.index.commit("Updated proxy list with latest files")
+        # Copy all .json files from OUTPUT_DIR to the repository
+        copy_json_files(OUTPUT_DIR, REPO_PATH)
+
+        repo.git.add(A=True)  # Adds all new or modified files
+        repo.index.commit("Updated proxy list with latest .json files")
         origin = repo.remote(name="origin")
         origin.push()
-        
-        print("[+] All proxy files uploaded successfully.")
+
+        print("[+] All .json files and directories uploaded successfully.")
     except Exception as e:
         print(f"[!] Error uploading to GitHub: {e}")
 
-#threading.Thread(target=run_scraper, daemon=True).start()
-upload_to_github()
-#schedule.every(30).minutes.do(upload_to_github)
+# Uncomment this line to run the scraper in a separate thread
+# threading.Thread(target=run_scraper, daemon=True).start()
 
-time.sleep(1800)
+# Start uploading files initially
+upload_to_github()
+
+# Schedule the upload every 30 minutes
+# schedule.every(30).minutes.do(upload_to_github)
 
 while True:
     schedule.run_pending()
